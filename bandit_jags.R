@@ -5,6 +5,7 @@ rm(list=ls())
 nParticipants <- 10 # if less than the full number, we will take a subset of participants to test code
 nTrials <- 30 # per block
 nBlocks <- 3
+nBandits <- 4
 
 
 # define working directory and datafile
@@ -42,6 +43,7 @@ for (p in 1:nParticipants){
 data <- list("nTrials",
              "nBlocks",
              "nParticipants",
+             "nBandits",
              "d", 
              "points"
              ) 
