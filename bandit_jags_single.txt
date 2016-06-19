@@ -1,0 +1,15 @@
+# Model for a restless bandit task:
+# Kalman filter with Probability of Maximum Utility choice rule
+# as per Konstandinidis & Speekenbrink (2015)
+model{
+  # Choice data
+  for (i in 1:nParticipants){
+    for (j in 1:nBlocks){
+      for (k in 1:nTrials){
+        
+        d[j,k,i] ~ dmnorm(mu[j,k,i,1:nBandits], sigma[j,k,i,1:nBandits])
+        
+      }
+    }
+  }
+}
