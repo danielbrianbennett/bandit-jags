@@ -31,13 +31,12 @@ extract$choice[extract$choice == "left"] = 4
 extract$choice <- as.numeric(extract$choice)
 
 # create data containers to pass to jags, and fill them
-d <- array(data = NA, dim = c(nBlocks,nTrials,nParticipants)) # choice data
-points <- array(data = NA, dim = c(nBlocks,nTrials,nParticipants)) # points data
+d <- array(data = NA, dim = c(nBlocks,nTrials)) # choice data
+points <- array(data = NA, dim = c(nBlocks,nTrials)) # points data
 
-for (p in 1:nParticipants){
-  d[,,p] <- matrix(extract[extract$ID == subsetID[p],]$choice,nBlocks,nTrials,byrow = T)
-  points[,,p] <- matrix(extract[extract$ID == subsetID[p],]$pointsWon,nBlocks,nTrials,byrow = T)
-}
+
+d[,] <- matrix(extract[extract$ID == subsetID,]$choice,nBlocks,nTrials,byrow = T)
+points[,] <- matrix(extract[extract$ID == subsetID,]$pointsWon,nBlocks,nTrials,byrow = T)
 
 # list data to be passed on to JAGS
 data <- list("nTrials",
