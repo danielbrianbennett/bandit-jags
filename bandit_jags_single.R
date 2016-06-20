@@ -35,7 +35,6 @@ choices <- array(data = NA, dim = c(nBlocks,nTrials)) # choice data
 points <- array(data = NA, dim = c(nBlocks,nTrials)) # points data
 choices[,] <- matrix(extract[extract$ID == subsetID,]$choice,nBlocks,nTrials,byrow = T)
 points[,] <- matrix(extract[extract$ID == subsetID,]$pointsWon,nBlocks,nTrials,byrow = T)
-deltaFunction <- vector(length = nBandits, mode = "integer")
 
 # specify comparison matrix A
 A <- array(data = 0, dim = c(3,4,4))
