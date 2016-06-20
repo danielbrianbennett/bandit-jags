@@ -3,10 +3,26 @@
 # as per Konstantinidis & Speekenbrink (2015)
 model{
   # Choice data
-  for (j in 1:nBlocks){
-    for (k in 1:nTrials){
+  for (iBlock in 1:nBlocks){
+    for (iTrial in 1:nTrials){
+      for (iBandit in 1:nBandits){
       
-      d[j,k] ~ dmnorm(mu[j,k,1:nBandits], sigma[j,k,1:nBandits])
+        # calculate prev mean, prev variance, whether chosen for each bandit
+        prevMean <- ifelse(iTrial == 1, 0, banditMean[iBlock,iTrial-1,iBandit])
+        prevVariance <- ifelse(iTrial == 1, 1000, banditVariance[iBlock,iTrial-1,iBandit])
+        deltaFunction <- ifelse(iBandit == choices[iBlock,iTrial],1,0) # =1 if chosen
+      
+        # calculate kalman gain, mean and sd of each bandit
+        kalmanGain[iBlock,iTrial,iBandit] <- (prevVariance + (sigma_zeta ^ 2)) /  (prevVariance + (sigma_zeta ^ 2) + (sigma_epsilon ^ 2))
+        banditMean[iBlock,iTrial,iBandit] <- prevMean + (deltaFunction * kalmanGain[iBlock,iTrial,iBandit] * (points[iBlock,iTrial] - prevMean))
+        banditVariance[iBlock,iTrial,iBandit] <- 1 - (deltaFunction * kalmanGain[iBlock,iTrial,iBandit] * (prevVariance + (sigma_zeta ^ 2)))
+      
+      
+      M[iBlock,iTrial,1:nBandits] <- A[,,iBandit] %*% banditMean[iBlock,iTrial,iBandit]
+      H <- A[,,iBandit] %*% diag(banditVariance[,iTrial-1,iBlock] + (epsilon^2)) %*% t(A[,,iBandit]) #### problems!
+      choices[iBlock,iTrial] ~ dmnorm(mu[j,k,1:nBandits], sigma[j,k,1:nBandits])
+      }
+      
       
     }
   }

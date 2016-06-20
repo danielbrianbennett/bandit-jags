@@ -7,7 +7,6 @@ nTrials <- 30 # per block
 nBlocks <- 3
 nBandits <- 4
 
-
 # define working directory and datafile
 dataDir <- "~/Google Drive/Works in Progress/JSBANDIT/Bandit/data/Bandit project shared data/"
 dataFile <- "banditData_v2point2.RData"
@@ -31,20 +30,27 @@ extract$choice[extract$choice == "left"] = 4
 extract$choice <- as.numeric(extract$choice)
 
 # create data containers to pass to jags, and fill them
-d <- array(data = NA, dim = c(nBlocks,nTrials)) # choice data
+choices <- array(data = NA, dim = c(nBlocks,nTrials)) # choice data
 points <- array(data = NA, dim = c(nBlocks,nTrials)) # points data
-
-
-d[,] <- matrix(extract[extract$ID == subsetID,]$choice,nBlocks,nTrials,byrow = T)
+choices[,] <- matrix(extract[extract$ID == subsetID,]$choice,nBlocks,nTrials,byrow = T)
 points[,] <- matrix(extract[extract$ID == subsetID,]$pointsWon,nBlocks,nTrials,byrow = T)
+
+# specify comparison matrix A
+A <- array(data = 0, dim = c(3,4,4))
+A[,,1] <- matrix(c(1,1,1,-1,0,0,0,-1,0,0,0,-1),nrow = 3, ncol = 4)
+A[,,2] <- matrix(c(-1,0,0,1,1,1,0,-1,0,0,0,-1),nrow = 3, ncol = 4)
+A[,,3] <- matrix(c(-1,0,0,0,-1,0,1,1,1,0,0,-1),nrow = 3, ncol = 4)
+A[,,4] <- matrix(c(-1,0,0,0,-1,0,0,0,-1,1,1,1),nrow = 3, ncol = 4)
 
 # list data to be passed on to JAGS
 data <- list("nTrials",
              "nBlocks",
              "nParticipants",
              "nBandits",
-             "d", 
-             "points"
+             "choices", 
+             "points",
+             "deltaFunction",
+             "A"
 ) 
 
 # list parameters to estimate in JAGS
