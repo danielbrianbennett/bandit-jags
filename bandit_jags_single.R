@@ -35,21 +35,17 @@ choices <- array(data = NA, dim = c(nBlocks,nTrials)) # choice data
 points <- array(data = NA, dim = c(nBlocks,nTrials)) # points data
 choices[,] <- matrix(extract[extract$ID == subsetID,]$choice,nBlocks,nTrials,byrow = T)
 points[,] <- matrix(extract[extract$ID == subsetID,]$pointsWon,nBlocks,nTrials,byrow = T)
-
-# specify comparison matrix A
-A <- array(data = 0, dim = c(3,4,4))
-A[,,1] <- matrix(c(1,1,1,-1,0,0,0,-1,0,0,0,-1),nrow = 3, ncol = 4)
-A[,,2] <- matrix(c(-1,0,0,1,1,1,0,-1,0,0,0,-1),nrow = 3, ncol = 4)
-A[,,3] <- matrix(c(-1,0,0,0,-1,0,1,1,1,0,0,-1),nrow = 3, ncol = 4)
-A[,,4] <- matrix(c(-1,0,0,0,-1,0,0,0,-1,1,1,1),nrow = 3, ncol = 4)
+mean0 = 0
+variance0 = 1000
 
 # list data to be passed on to JAGS
-data <- list("A",
-             "choices",
+data <- list("choices",
              "nBandits", 
              "nBlocks",
              "nTrials",
-             "points"
+             "points",
+             "mean0",
+             "variance0"
 ) 
 
 # list parameters to estimate in JAGS

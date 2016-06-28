@@ -3,12 +3,13 @@
 # as per Konstantinidis & Speekenbrink (2015)
 #
 # inputs are
-#   A:              differencing matrix for comparing bandit means (see K&S, p. 361)
 #   choices:        matrix of participant's selections
 #   nBandits:       number of bandits
 #   nBlocks:        number of blocks per participant
 #   nTrials:        number of trials per block
 #   points:         matrix of observed payouts
+#   mean0:
+#   variance0:
 #
 # parameters to be estimated are
 #   sigma_zeta:     bandit walk SD
@@ -19,34 +20,47 @@
 
 model{
   
+  # sigma parameters distributed as uniform
+  sigma_zeta ~ dunif(0,100)
+  sigma_epsilon ~ dunif(0,100)
+  
   # Loop through blocks
   for (iBlock in 1:nBlocks){
   
     # Loop through trials
-    for (iTrial in 1:nTrials){
+    for (iTrial in 2:(nTrials+1)){
     
-      # Loop through bandits
+      # Loop through bandits a first time
       for (iBandit in 1:nBandits){
       
-        # calculate prev mean, prev variance, whether chosen for each bandit
-        prevMean[iBandit] <- ifelse(iTrial == 1, 0, banditMean[iBlock,iTrial-1,iBandit])
-        prevVariance[iBandit] <- ifelse(iTrial == 1, 1000, banditVariance[iBlock,iTrial-1,iBandit])
-        deltaFunction <- ifelse(iBandit == choices[iBlock,iTrial],1,0) # deltaFunction = 1 if bandit chosen, 0 otherwise
+        banditMean[iBlock,iTrial-1,iBandit] <- ifelse(iTrial == 2, mean0, banditMean[iBlock,iTrial-1,iBandit])
       
-        # calculate kalman gain, mean and sd of each bandit
-        kalmanGain[iBlock,iTrial,iBandit] <- (prevVariance + (sigma_zeta ^ 2)) /  (prevVariance + (sigma_zeta ^ 2) + (sigma_epsilon ^ 2)) 
-        banditMean[iBlock,iTrial,iBandit] <- prevMean[iBandit] + (deltaFunction * kalmanGain[iBlock,iTrial,iBandit] * (points[iBlock,iTrial] - prevMean[iBandit])) # K&S, equation 4
-        banditVariance[iBlock,iTrial,iBandit] <- 1 - (deltaFunction * kalmanGain[iBlock,iTrial,iBandit] * (prevVariance[iBandit] + (sigma_zeta ^ 2))) # K&S, equation 5
+        # retrieve prev mean, prev variance, whether chosen for each bandit
+        prevMean[iBlock,iTrial,iBandit] <- ifelse(iTrial == 1, mean0, prevMean[iBlock,iTrial,iBandit])
+        prevVariance[iBlock,iTrial,iBandit] <- ifelse(iTrial == 1, variance0, banditVariance[iBlock,iTrial,iBandit])
+        deltaFunction[iBlock,iTrial,iBandit] <- ifelse(iBandit == choices[iBlock,iTrial],1,0) # deltaFunction = 1 if bandit chosen, 0 otherwise
       
-        # calculate mu (M) and sigma (H) vectors for multivariate normal distribution (see K&S, p. 361)
-        M[iBlock,iTrial,1:nBandits] <- A[,,iBandit] %*% prevMean # mu 
-        H[iBlock,iTrial,1:nBandits] <- A[,,iBandit] %*% diag(banditVariance[iBlock,iTrial,] + (sigma_epsilon ^ 2)) %*% t(A[,,iBandit]) # sigma. this is problematic; I don't think JAGS has a built-in diagonal matrix function
-        pi[iBandit] = pmvnorm(lower= 0,mean = as.vector(M[iBlock,iTrial,]), sigma = H[iBlock,iTrial,])[1] # I don't know how to integrate over a multivariate normal PDF in BUGS; this is how you would do it in R using the pmvnorm package.
+        # calculate kalman gain, mean and variance of each bandit
+        kalmanGain[iBlock,iTrial,iBandit] <- (banditVariance[iBlock,iTrial-1,iBandit] + (sigma_zeta ^ 2)) /  (banditVariance[iBlock,iTrial-1,iBandit] + (sigma_zeta ^ 2) + (sigma_epsilon ^ 2)) 
+        banditMean[iBlock,iTrial,iBandit] <- banditMean[iBlock,iTrial-1,iBandit] + (deltaFunction[iBlock,iTrial,iBandit] * kalmanGain[iBlock,iTrial,iBandit] * (points[iBlock,iTrial] - prevMean[iBlock,iTrial,iBandit])) # K&S, eq. 4
+        banditVariance[iBlock,iTrial,iBandit] <- 1 - (deltaFunction[iBlock,iTrial,iBandit] * kalmanGain[iBlock,iTrial,iBandit] * (banditVariance[iBlock,iTrial-1,iBandit] + (sigma_zeta ^ 2))) # K&S, eq. 5
+
+        # each bandit's momentary utility is distributed as a gaussian
+        u[iBlock,iTrial,iBandit] ~ dnorm(banditMean[iBlock,iTrial,iBandit], 1/banditVariance[iBlock,iTrial,iBandit]) # parameterised by mean and precision (1/variance)
+        
+      } # bandit loop 1
       
-      } # bandit
+      maxBandit[iBlock,iTrial] <- max(u[iBlock,iTrial,1:nBandits])
+      
+      # Loop through bandits a second time
+      for (iBandit in 1:nBandits){
+      
+        pi[iBlock,iTrial,iBandit] <- ifelse(iBandit == 3, 1, 0) # set choice probability to 1 if is max util, 0 otherwise
+        
+      } # bandit loop 2
       
       # choices distributed as categorical distribution with probability vector as per multivariate normal above (K&S, equation )
-      choices[iBlock,iTrial] ~ dcat(pi) 
+      choices[iBlock,iTrial] ~ dcat(pi[iBlock,iTrial,1:nBandits]) 
 
     } # trial
   } # block
