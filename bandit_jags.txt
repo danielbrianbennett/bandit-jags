@@ -1,35 +1,35 @@
-# Model for a restless bandit task:
-# Kalman filter with Probability of Maximum Utility choice rule
-# as per Konstantinidis & Speekenbrink (2015)
-#
-# inputs are
-#   choices:          matrix of participant's selections
-#   changeLag:        matrix containing trial number after change
-#   whichFilled:      matrix indicating which option was filled
-#   nBandits:         number of bandits
-#   nBlocks:          number of blocks per participant
-#   nTrials:          number of trials per block
-#   points:           matrix of observed payouts
-#   mean0:            presumed initial mean value of bandit payoff
-#   variance0:        presumed initial variance of bandit payoff
-#   fudgeFactor:      very small number used to create slightly non-deterministic choices
-#
-# parameters to be estimated are
-#   sigma_zeta:       bandit walk SD
-#   sigma_epsilon:    bandit payout SD
-#   mu_b:             bonus size (hyperprior mean)
-#   sigma_b:          bonus size (hyperprior SD)
-#   mu_p:             trial-wise bonus decay (hyperprior mean)
-#   sigma_p:          trial-wise bonus decay (hyperprior SD)
-#   mu_q:             block-wise bonus decay (hyperprior mean)
-#   sigma_q:          block-wise bonus decay (hyperprior SD)
+## Model for a restless bandit task:
+## Kalman filter with Probability of Maximum Utility choice rule
+## as per Konstantinidis & Speekenbrink (2015)
+##
+## inputs are
+##   choices:          matrix of participant's selections
+##   changeLag:        matrix containing trial number after change
+##   whichFilled:      matrix indicating which option was filled
+##   nBandits:         number of bandits
+##   nBlocks:          number of blocks per participant
+##   nTrials:          number of trials per block
+##   points:           matrix of observed payouts
+##   mean0:            presumed initial mean value of bandit payoff
+##   variance0:        presumed initial variance of bandit payoff
+##   fudgeFactor:      very small number used to create slightly non-deterministic choices (line 98)
+##
+## parameters to be estimated are
+##   sigma_zeta:       bandit walk SD
+##   sigma_epsilon:    bandit payout SD
+##   mu_b:             change bonus size (hyperprior mean)
+##   sigma_b:          change bonus size (hyperprior SD)
+##   mu_p:             trial-wise bonus decay (hyperprior mean)
+##   sigma_p:          trial-wise bonus decay (hyperprior SD)
+##   mu_q:             block-wise bonus decay (hyperprior mean)
+##   sigma_q:          block-wise bonus decay (hyperprior SD)
 
 data{
 
 # create duplicate of choice variable to avoid directed graph problem
 indicatorChoices <- choices
 
-}
+} # data
 
 model{
   
@@ -42,22 +42,22 @@ model{
   sigma_b ~ dgamma(.001,.001)
   
   # hyperparameters for p hyperprior
-  mu_p ~ dunif(0,10)
+  mu_p ~ dunif(0,10) # JAGS complains if p is negative; this is one way to prevent that
   sigma_p ~ dgamma(.001,.001)
   
   # hyperparameters for q hyperprior
-  mu_q ~ dunif(0,10)
+  mu_q ~ dunif(0,10) # JAGS complains if q is negative; this is one way to prevent that
   sigma_q ~ dgamma(.001,.001)
 
-  # initialise bandit mean and variance
+  # initialise bandit mean and variance with seed values
   for (iParticipant in 1:nParticipants){
     for (iBandit in 1:nBandits){
       for (iBlock in 1:nBlocks){
         banditMean[iBlock,1,iBandit,iParticipant] <- mean0
         banditVariance[iBlock,1,iBandit,iParticipant] <- variance0
-      }
-    }
-  }
+      } # block
+    } # bandit
+  } # participant
   
   for (iParticipant in 1:nParticipants){
   
@@ -83,14 +83,13 @@ model{
           kalmanGain[iBlock,iTrial,iBandit,iParticipant] <- (banditVariance[iBlock,iTrial-1,iBandit,iParticipant] + pow(sigma_zeta,2)) /  (banditVariance[iBlock,iTrial-1,iBandit,iParticipant] + pow(sigma_zeta,2) + pow(sigma_epsilon,2)) 
           banditVariance[iBlock,iTrial,iBandit,iParticipant] <- (1 - deltaFunction[iBlock,iTrial,iBandit,iParticipant] * kalmanGain[iBlock,iTrial,iBandit,iParticipant]) * (banditVariance[iBlock,iTrial-1,iBandit,iParticipant] + pow(sigma_zeta,2)) # K&S, eq. 5
           banditMean[iBlock,iTrial,iBandit,iParticipant] <- banditMean[iBlock,iTrial-1,iBandit,iParticipant] + (deltaFunction[iBlock,iTrial,iBandit,iParticipant] * kalmanGain[iBlock,iTrial,iBandit,iParticipant] * (points[iBlock,iTrial-1,iParticipant] - banditMean[iBlock,iTrial-1,iBandit,iParticipant])) + bonus[iBlock,iTrial,iBandit,iParticipant] # K&S, eq. 4
-          
-  
+        
           # each bandit's momentary utility is distributed as a gaussian
           u[iBlock,iTrial,iBandit,iParticipant] ~ dnorm(banditMean[iBlock,iTrial-1,iBandit,iParticipant],1/banditVariance[iBlock,iTrial-1,iBandit,iParticipant]) # parameterised by mean and precision (1/variance)
           
         } # bandit loop 1
         
-        maxBandit[iBlock,iTrial,iParticipant] <- max(u[iBlock,iTrial,,iParticipant])#
+        maxBandit[iBlock,iTrial,iParticipant] <- max(u[iBlock,iTrial,,iParticipant])
         
         # Loop through bandits a second time
         for (iBandit in 1:nBandits){
@@ -105,4 +104,4 @@ model{
       } # trial
     } # block 
   } # participant
-}
+} # model

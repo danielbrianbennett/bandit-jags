@@ -1,16 +1,16 @@
-# clear workspace:  
+# clear workspace  
 rm(list=ls())
 
 # load rjags package
 library(R2jags)
 
-# set a couple of helpful variables
+# set constants
 nTrials <- 30 # per block
 nBlocks <- 3
 nBandits <- 4
-mean0 <- 0
-variance0 <- 1000
-fudgeFactor <- .00000001
+mean0 <- 0 # assumed initial payoff mean of all bandits
+variance0 <- 1000 # assumed initial payoff variance of all bandits
+fudgeFactor <- .00000001 # fudge factor for deterministic choices
 
 # define working directory and datafile
 dataDir <- "~/Google Drive/Works in Progress/JSBANDIT/Bandit/data/Bandit project shared data/"
@@ -33,6 +33,7 @@ extract$choice[extract$choice == "bottom"] = 3
 extract$choice[extract$choice == "left"] = 4
 extract$choice <- as.numeric(extract$choice)
 
+# recode filled option index from string to numeric
 extract$whichFilled[extract$whichFilled == "none"] = -1
 extract$whichFilled[extract$whichFilled == "top"] = 1
 extract$whichFilled[extract$whichFilled == "right"] = 2
@@ -46,7 +47,7 @@ points <- array(data = NA, dim = c(nBlocks,nTrials,nParticipants)) # points data
 changeLag <- array(data = NA, dim = c(nBlocks,nTrials,nParticipants)) # change lag data
 whichFilled <- array(data = NA, dim = c(nBlocks,nTrials,nParticipants)) # which changed data
 
-# deal data to arrays built above
+# deal data to the arrays built above
 for (p in 1:nParticipants){
   choices[,,p] <- matrix(extract[extract$ID == subsetID[p],]$choice,nBlocks,nTrials,byrow = T)
   points[,,p] <- matrix(extract[extract$ID == subsetID[p],]$pointsWon,nBlocks,nTrials,byrow = T)
