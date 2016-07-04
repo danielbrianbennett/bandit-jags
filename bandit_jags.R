@@ -81,14 +81,14 @@ parameters <- c("sigma_zeta",
 
 # initial values of parameters
 initVals <-	list(list(
-            sigma_zeta = 4,
-            sigma_epsilon = 24,
+            sigma_zeta = 10,
+            sigma_epsilon = 10,
             mu_q = 1,
-            sigma_q = .2,
+            sigma_q = 1,
             mu_p = 1,
-            sigma_p = .2,
-            mu_b = 4,
-            sigma_b = 1
+            sigma_p = 1,
+            mu_b = 10,
+            sigma_b = 3
             ))
 
 # call jags
