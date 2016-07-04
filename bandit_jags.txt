@@ -1,15 +1,106 @@
 # Model for a restless bandit task:
 # Kalman filter with Probability of Maximum Utility choice rule
-# as per Konstandinidis & Speekenbrink (2015)
+# as per Konstantinidis & Speekenbrink (2015)
+#
+# inputs are
+#   choices:          matrix of participant's selections
+#   nBandits:         number of bandits
+#   nBlocks:          number of blocks per participant
+#   nTrials:          number of trials per block
+#   points:           matrix of observed payouts
+#   mean0:            presumed initial mean value of bandit payoff
+#   variance0:        presumed initial variance of bandit payoff
+#   fudgeFactor:      very small number used to create slightly non-deterministic choices
+#
+# parameters to be estimated are
+#   sigma_zeta:       bandit walk SD
+#   sigma_epsilon:    bandit payout SD
+#   mu_b:             bonus size (hyperprior mean)
+#   sigma_b:          bonus size (hyperprior SD)
+#   mu_p:             trial-wise bonus decay (hyperprior mean)
+#   sigma_p:          trial-wise bonus decay (hyperprior SD)
+#   mu_q:             block-wise bonus decay (hyperprior mean)
+#   sigma_q:          block-wise bonus decay (hyperprior SD)
+
+data{
+
+# create duplicate of choice variable to avoid directed graph problem
+indicatorChoices <- choices
+
+}
+
 model{
-  # Choice data
-  for (i in 1:nParticipants){
-    for (j in 1:nBlocks){
-      for (k in 1:nTrials){
-      
-        d[j,k,i] ~ dmnorm(mu[j,k,i,1:nBandits], sigma[j,k,i,1:nBandits])
-      
+  
+  # sigma parameters distributed as uniform
+  sigma_zeta ~ dunif(0,100)
+  sigma_epsilon ~ dunif(0,100)
+  
+  # hyperparameters for b hyperprior
+  mu_b ~ dnorm(0,.001)
+  sigma_b ~ dgamma(.001,.001)
+  
+  # hyperparameters for p hyperprior
+  mu_p ~ dnorm(0,.001)
+  sigma_p ~ dgamma(.001,.001)
+  
+  # hyperparameters for q hyperprior
+  mu_q ~ dnorm(0,.001)
+  sigma_q ~ dgamma(.001,.001)
+
+  # initialise bandit mean and variance
+  for (iParticipant in 1:nParticipants){
+    for (iBandit in 1:nBandits){
+      for (iBlock in 1:nBlocks){
+        banditMean[iBlock,1,iBandit,iParticipant] <- mean0
+        banditVariance[iBlock,1,iBandit,iParticipant] <- variance0
       }
     }
   }
+  
+  for (iParticipant in 1:nParticipants){
+  
+    # b, p, and q as draws from hyperpriors
+    b[iParticipant] ~ dnorm(mu_b,1/(pow(sigma_b,2)))
+    p[iParticipant] ~ dnorm(mu_p,1/(pow(sigma_p,2)))
+    q[iParticipant] ~ dnorm(mu_q,1/(pow(sigma_q,2)))
+  
+    # Loop through blocks
+    for (iBlock in 1:nBlocks){
+    
+      # Loop through trials
+      for (iTrial in 2:(nTrials+1)){
+      
+        # Loop through bandits a first time
+        for (iBandit in 1:nBandits){
+        
+          # retrieve whether chosen for each bandit
+          deltaFunction[iBlock,iTrial,iBandit,iParticipant] <- ifelse(iBandit == indicatorChoices[iBlock,iTrial-1,iParticipant],1,0) # deltaFunction = 1 if bandit chosen, 0 otherwise
+          bonus[iBlock,iTrial,iBandit,iParticipant] <- ifelse(whichFilled[iBlock,iTrial-1,iParticipant] == iBandit && changeLag[iBlock,iTrial-1,iParticipant] > 0, b[iParticipant] * (pow(changeLag[iBlock,iTrial-1,iParticipant],p[iParticipant])) * (pow(iBlock - 1,q[iParticipant])), 0)
+        
+          # calculate kalman gain, mean and variance of each bandit
+          kalmanGain[iBlock,iTrial,iBandit,iParticipant] <- (banditVariance[iBlock,iTrial-1,iBandit,iParticipant] + pow(sigma_zeta,2)) /  (banditVariance[iBlock,iTrial-1,iBandit,iParticipant] + pow(sigma_zeta,2) + pow(sigma_epsilon,2)) 
+          banditVariance[iBlock,iTrial,iBandit,iParticipant] <- (1 - deltaFunction[iBlock,iTrial,iBandit,iParticipant] * kalmanGain[iBlock,iTrial,iBandit,iParticipant]) * (banditVariance[iBlock,iTrial-1,iBandit,iParticipant] + pow(sigma_zeta,2)) # K&S, eq. 5
+          banditMean[iBlock,iTrial,iBandit,iParticipant] <- banditMean[iBlock,iTrial-1,iBandit,iParticipant] + (deltaFunction[iBlock,iTrial,iBandit,iParticipant] * kalmanGain[iBlock,iTrial,iBandit,iParticipant] * (points[iBlock,iTrial-1,iParticipant] - banditMean[iBlock,iTrial-1,iBandit,iParticipant])) + bonus[iBlock,iTrial,iBandit,iParticipant] # K&S, eq. 4
+          
+  
+          # each bandit's momentary utility is distributed as a gaussian
+          u[iBlock,iTrial,iBandit,iParticipant] ~ dnorm(banditMean[iBlock,iTrial-1,iBandit,iParticipant],1/banditVariance[iBlock,iTrial-1,iBandit,iParticipant]) # parameterised by mean and precision (1/variance)
+          
+        } # bandit loop 1
+        
+        maxBandit[iBlock,iTrial,iParticipant] <- max(u[iBlock,iTrial,,iParticipant])#
+        
+        # Loop through bandits a second time
+        for (iBandit in 1:nBandits){
+        
+          pi[iBlock,iTrial,iBandit,iParticipant] <- ifelse(u[iBlock,iTrial,iBandit,iParticipant] == maxBandit[iBlock,iTrial,iParticipant], 1 - fudgeFactor, fudgeFactor / (nBandits - 1)) # set choice probability to 1 if is max util, 0 otherwise
+          
+        } # bandit loop 2
+        
+        # choices distributed as categorical distribution with probability vector as per the above
+        choices[iBlock,iTrial-1,iParticipant] ~ dcat(pi[iBlock,iTrial,,iParticipant]) 
+  
+      } # trial
+    } # block 
+  } # participant
 }
