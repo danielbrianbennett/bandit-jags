@@ -4,6 +4,8 @@
 #
 # inputs are
 #   choices:          matrix of participant's selections
+#   changeLag:        matrix containing trial number after change
+#   whichFilled:      matrix indicating which option was filled
 #   nBandits:         number of bandits
 #   nBlocks:          number of blocks per participant
 #   nTrials:          number of trials per block
@@ -75,7 +77,7 @@ model{
         
           # retrieve whether chosen for each bandit
           deltaFunction[iBlock,iTrial,iBandit,iParticipant] <- ifelse(iBandit == indicatorChoices[iBlock,iTrial-1,iParticipant],1,0) # deltaFunction = 1 if bandit chosen, 0 otherwise
-          bonus[iBlock,iTrial,iBandit,iParticipant] <- ifelse(whichFilled[iBlock,iTrial-1,iParticipant] == iBandit && changeLag[iBlock,iTrial-1,iParticipant] > 0, b[iParticipant] * (pow(changeLag[iBlock,iTrial-1,iParticipant],p[iParticipant])) * (pow(iBlock - 1,q[iParticipant])), 0)
+          bonus[iBlock,iTrial,iBandit,iParticipant] <- ifelse(whichFilled[iBlock,iTrial-1,iParticipant] == iBandit, b[iParticipant] * (pow(changeLag[iBlock,iTrial-1,iParticipant],p[iParticipant])) * (pow(iBlock,q[iParticipant])), 0)
         
           # calculate kalman gain, mean and variance of each bandit
           kalmanGain[iBlock,iTrial,iBandit,iParticipant] <- (banditVariance[iBlock,iTrial-1,iBandit,iParticipant] + pow(sigma_zeta,2)) /  (banditVariance[iBlock,iTrial-1,iBandit,iParticipant] + pow(sigma_zeta,2) + pow(sigma_epsilon,2)) 
@@ -93,7 +95,7 @@ model{
         # Loop through bandits a second time
         for (iBandit in 1:nBandits){
         
-          pi[iBlock,iTrial,iBandit,iParticipant] <- ifelse(u[iBlock,iTrial,iBandit,iParticipant] == maxBandit[iBlock,iTrial,iParticipant], 1 - fudgeFactor, fudgeFactor / (nBandits - 1)) # set choice probability to 1 if is max util, 0 otherwise
+          pi[iBlock,iTrial,iBandit,iParticipant] <- ifelse(u[iBlock,iTrial,iBandit,iParticipant] == maxBandit[iBlock,iTrial,iParticipant], 1 - fudgeFactor, fudgeFactor / (nBandits - 1)) # set choice probability to ~1 if is max util, ~0 otherwise
           
         } # bandit loop 2
         
