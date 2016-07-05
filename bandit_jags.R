@@ -22,7 +22,7 @@ setwd(dataDir)
 load(dataFile)
 
 # extract participant data
-nParticipants <- length(unique(sorted.data$ID)) # how many participants' data to test?
+nParticipants <- 5#length(unique(sorted.data$ID)) # how many participants' data to test?
 subsetID <- unique(sorted.data$ID)[1:nParticipants]
 extract <- subset(sorted.data, ID %in% subsetID)
 
